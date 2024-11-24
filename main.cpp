@@ -27,12 +27,23 @@ static const int   c_2DTopoColors = 16;
 #include <array>
 #include <random>
 #include <vector>
-#include <direct.h>
+#include <cfloat> // Add this line to include FLT_MAX
+
+#ifdef _WIN32
+	#include <direct.h>
+#else
+	#include <sys/stat.h>
+	#include <sys/types.h>
+#endif
 
 #include "maths.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb/stb_image_write.h"
+#pragma GCC diagnostic pop
+
 
 struct Gauss2D
 {
@@ -269,8 +280,8 @@ void DoTest2D()
 	}
 
 	// Randomly init starting points
-	std::vector<float> allPointsAvgHeights(_countof(c_2DLearningRates), 0.0f);
-	std::vector<std::vector<float2>> allPoints(_countof(c_2DLearningRates));
+	std::vector<float> allPointsAvgHeights(std::size(c_2DLearningRates), 0.0f);
+	std::vector<std::vector<float2>> allPoints(std::size(c_2DLearningRates));
 	for (std::vector<float2>& points : allPoints)
 	{
 		points.resize(c_2DPointsPerLearningRate);
@@ -278,9 +289,9 @@ void DoTest2D()
 			p = float2{ distPos(rng), distPos(rng) };
 	}
 
-	std::vector<float> allAdamPointsAvgHeights(_countof(c_2DAdamAlphas), 0.0f);
-	std::vector<std::vector<AdamPoint>> allAdamPoints(_countof(c_2DAdamAlphas));
-	for (size_t alphaIndex = 0; alphaIndex < _countof(c_2DAdamAlphas); ++alphaIndex)
+	std::vector<float> allAdamPointsAvgHeights(std::size(c_2DAdamAlphas), 0.0f);
+	std::vector<std::vector<AdamPoint>> allAdamPoints(std::size(c_2DAdamAlphas));
+	for (size_t alphaIndex = 0; alphaIndex < std::size(c_2DAdamAlphas); ++alphaIndex)
 	{
 		std::vector<AdamPoint>& adamPoints = allAdamPoints[alphaIndex];
 
@@ -313,7 +324,7 @@ void DoTest2D()
 	auto DrawAdamPoints = [&](std::vector<unsigned char>& pixels, int width, int height, int components)
 		{
 			// draw the adam points
-			int pointIndex = _countof(c_2DLearningRates);
+			int pointIndex = std::size(c_2DLearningRates);
 			for (std::vector<AdamPoint>& adamPoints : allAdamPoints)
 			{
 				for (const AdamPoint& point : adamPoints)
@@ -393,12 +404,16 @@ void DoTest2D()
 	// Open the csv
 	char fileName[1024];
 	FILE* csvFile = nullptr;
-	sprintf_s(fileName, "out/2D_%u.csv", seed);
-	fopen_s(&csvFile, fileName, "wb");
+	snprintf(fileName, sizeof(fileName), "out/2D_%u.csv", seed);
+	csvFile = fopen(fileName, "wb");
+	if (csvFile == nullptr) {
+		perror("Failed to open file");
+		return;
+	}
 	fprintf(csvFile, "\"Step\"");
-	for (size_t learningRateIndex = 0; learningRateIndex < _countof(c_2DLearningRates); ++learningRateIndex)
+	for (size_t learningRateIndex = 0; learningRateIndex < std::size(c_2DLearningRates); ++learningRateIndex)
 		fprintf(csvFile, ",\"GD LR %f\"", c_2DLearningRates[learningRateIndex]);
-	for (size_t learningRateIndex = 0; learningRateIndex < _countof(c_2DAdamAlphas); ++learningRateIndex)
+	for (size_t learningRateIndex = 0; learningRateIndex < std::size(c_2DAdamAlphas); ++learningRateIndex)
 		fprintf(csvFile, ",\"Adam Alpha %f\"", c_2DAdamAlphas[learningRateIndex]);
 	fprintf(csvFile, "\n");
 
@@ -406,7 +421,7 @@ void DoTest2D()
 	{
 		fprintf(csvFile, "\"%i\"", 0);
 
-		for (size_t learningRateIndex = 0; learningRateIndex < _countof(c_2DLearningRates); ++learningRateIndex)
+		for (size_t learningRateIndex = 0; learningRateIndex < std::size(c_2DLearningRates); ++learningRateIndex)
 		{
 			float& avgHeight = allPointsAvgHeights[learningRateIndex];
 			avgHeight = 0.0f;
@@ -419,7 +434,7 @@ void DoTest2D()
 			fprintf(csvFile, ",\"%f\"", avgHeight);
 		}
 
-		for (size_t alphaIndex = 0; alphaIndex < _countof(c_2DAdamAlphas); ++alphaIndex)
+		for (size_t alphaIndex = 0; alphaIndex < std::size(c_2DAdamAlphas); ++alphaIndex)
 		{
 			std::vector<AdamPoint>& adamPoints = allAdamPoints[alphaIndex];
 
@@ -443,11 +458,11 @@ void DoTest2D()
 		fprintf(csvFile, "\"%i\"", i + 1);
 
 		// show where the points are
-		sprintf_s(fileName, "out/2D_%u_%i.png", seed, i);
+		snprintf(fileName, sizeof(fileName), "out/2D_%u_%i.png", seed, i);
 		DrawGaussians(gaussians, fileName, DrawPoints, DrawAdamPoints, DrawAvgs, i, c_2DNumSteps);
 
 		// update the points
-		for (size_t learningRateIndex = 0; learningRateIndex < _countof(c_2DLearningRates); ++learningRateIndex)
+		for (size_t learningRateIndex = 0; learningRateIndex < std::size(c_2DLearningRates); ++learningRateIndex)
 		{
 			float& avgHeight = allPointsAvgHeights[learningRateIndex];
 			avgHeight = 0.0f;
@@ -470,7 +485,7 @@ void DoTest2D()
 		}
 
 		// update the adam points
-		for (size_t alphaIndex = 0; alphaIndex < _countof(c_2DAdamAlphas); ++alphaIndex)
+		for (size_t alphaIndex = 0; alphaIndex < std::size(c_2DAdamAlphas); ++alphaIndex)
 		{
 			float alpha = c_2DAdamAlphas[alphaIndex];
 
@@ -507,13 +522,17 @@ void DoTest2D()
 	fclose(csvFile);
 
 	// show the final position
-	sprintf_s(fileName, "out/2D_%u_%i.png", seed, c_2DNumSteps);
+	snprintf(fileName, sizeof(fileName), "out/2D_%u_%i.png", seed, c_2DNumSteps);
 	DrawGaussians(gaussians, fileName, DrawPoints, DrawAdamPoints, DrawAvgs, c_2DNumSteps, c_2DNumSteps);
 }
 
 int main(int argc, char** argv)
 {
+#ifdef _WIN32
 	_mkdir("out");
+#else
+	mkdir("out", 0755);
+#endif
 
 	DoTest2D();
 
